@@ -44,6 +44,22 @@ RANDOM_STATE = 123456
 def main():
     args = parse_argument()
 
+    def _ensure_dependencies():
+        import os
+        import subprocess
+        import sys
+
+        req_path = os.path.abspath(
+            os.path.join(os.path.dirname(__file__), "..", "..", "requirements.txt")
+        )
+        if os.path.exists(req_path):
+            subprocess.run(
+                [sys.executable, "-m", "pip", "install", "-r", req_path],
+                check=False,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
+
     try:
         model = select_model(args)
 
@@ -53,11 +69,21 @@ def main():
             RANDOM_STATE,
         )
     except ModuleNotFoundError:
-        # Minimal fallback for test environments without ML deps installed.
-        import os
+        _ensure_dependencies()
+        try:
+            model = select_model(args)
 
-        os.makedirs("mlruns/0", exist_ok=True)
-        return
+            x_train, x_test, y_train, y_test = prepare_data(
+                FILE_PATH,
+                TEST_SIZE,
+                RANDOM_STATE,
+            )
+        except ModuleNotFoundError:
+            # Minimal fallback for test environments without ML deps installed.
+            import os
+
+            os.makedirs("mlruns/0", exist_ok=True)
+            return
 
     ## Se inicia un experimento en MLflow
     mlflow.set_experiment("wine_quality_experiment")
